@@ -12,8 +12,8 @@
 
 // Definition of static strings in the class
 const std::string cmdline_parser::INPUTFILE = "input file";
-const std::string cmdline_parser::NUMTHREADS = "output file";
-const std::string cmdline_parser::PERIOD = "user input";
+const std::string cmdline_parser::NUMTHREADS = "num threads";
+const std::string cmdline_parser::PERIOD = "period";
 
 //-------------------------------------------------------------------------//
 // Constructor, initialise the variables_map object with default
@@ -31,8 +31,8 @@ cmdline_parser::cmdline_parser(void) : vm(), od("Options") {
             ("help,?", "show usage help")
 
             ((INPUTFILE + ",i").c_str(), po::value<std::string>(), "input file name")
-            ((NUMTHREADS + ",t").c_str(), "number of threads to be used")
-            ((PERIOD + ",p").c_str(), "period (ms) after which to collate and print frequencies");
+            ((NUMTHREADS + ",t").c_str(), po::value<int>(), "number of threads to be used")
+            ((PERIOD + ",p").c_str(), po::value<int>(), "period (ms) after which to collate and print frequencies");
 };
 
 //-------------------------------------------------------------------------//
@@ -53,15 +53,15 @@ bool cmdline_parser::process_cmdline(int argc, char * argv[]) {
     po::notify(vm);
 
     bool success = true;
-	
-	// THIS BELOW BIT IS COMMENTED OUT BECAUSE I'VE INCLUDED DEFAULT VALUES
-	/*
-    //Both period and number of threads must be defined
-    if (vm.count(PERIOD) + vm.count(NUMTHREADS) != 2) {
-        //Check if valid number of cyphers given
-        success = false;
-        errors.push_back("Please specify the period length and the number of threads to use");
-    }*/
+
+    // THIS BELOW BIT IS COMMENTED OUT BECAUSE I'VE INCLUDED DEFAULT VALUES
+    /*
+//Both period and number of threads must be defined
+if (vm.count(PERIOD) + vm.count(NUMTHREADS) != 2) {
+    //Check if valid number of cyphers given
+    success = false;
+    errors.push_back("Please specify the period length and the number of threads to use");
+}*/
 
     return success;
 }
@@ -84,9 +84,10 @@ std::string cmdline_parser::get_input_filename(void) const {
  * returns the number of threads specified
  */
 int cmdline_parser::get_num_threads(void) {
-	if (vm.count(NUMTHREADS) == 0)	//If unspecified
-        return 4;	//Default thread number
+    if (vm.count(NUMTHREADS) == 0) //If unspecified
+        return 4; //Default thread number
     return vm[NUMTHREADS].as<int>();
+    //return boost::any_cast<int>(vm[NUMTHREADS]);
 }
 
 /**Get period
@@ -94,8 +95,8 @@ int cmdline_parser::get_num_threads(void) {
  * returns the period for collation specified
  */
 int cmdline_parser::get_period(void) {
-	if (vm.count(PERIOD) == 0)	//If unspecified
-        return 4000;	//Default period (in ms)
+    if (vm.count(PERIOD) == 0) //If unspecified
+        return 4000; //Default period (in ms)
     return vm[PERIOD].as<int>();
 }
 
