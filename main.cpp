@@ -95,6 +95,8 @@ int main(int argc, char** argv) {
         exit(EXIT_FAILURE);
     }
     
+    fileStr.erase(remove_if(fileStr.begin(), fileStr.end(), [](char c) {return isspace(c);}), fileStr.end());   //Remove all spaces from string
+    
     inpFileStream.close();
 
     int numThreads = parser.get_num_threads();
@@ -104,11 +106,14 @@ int main(int argc, char** argv) {
     cout << "Period (ms): " << period << endl;
     
     string * section = new string[numThreads];
-    int strLen = fileStr.length() / numThreads;
-
-    for (int i = 0; i < numThreads; i++) {
-        section[i] = fileStr.substr(i*strLen, strLen);
-        cout << section[i] << endl;
+    
+    int fileLen = fileStr.length();     //Number of characters in the file
+    
+    int at, pre = 0, i;
+    for (pre = i = 0; i < numThreads; ++i) {
+        at = (fileLen + fileLen*i)/numThreads;
+        section[i] = fileStr.substr(pre, at-pre);
+        pre = at;
     }
 
     thread * threads = new thread[numThreads];
@@ -127,13 +132,9 @@ int main(int argc, char** argv) {
     for (int i = 0 ; i < numThreads ; i++) {
         for( map<char, int>::iterator ii = functors[i].count.begin(); ii != functors[i].count.end(); ++ii)
         {
-            cout << (*ii).first << ": " << (*ii).second << endl;
             finalCount[(*ii).first] += (*ii).second;
         }
-        cout << "*****************************************" << endl;
     }
-    
-    cout << "FINAL" << endl;
     
     for( map<char, int>::iterator ii = finalCount.begin(); ii != finalCount.end(); ++ii)
     {
