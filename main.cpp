@@ -2,8 +2,8 @@
  * Wesley Robinson - RBNWES001
  * main.cpp
  * Tut 4 - Templating
- * Program to demonstrate the use of Templating to implement various ciphers which can
- * be used to encrypt and decrypt text.
+ * Program to demonstrate the use of Templating to implement various ciphers 
+ * which can be used to encrypt and decrypt text.
  * Created on 07 May 2013, 1:10 PM
  */
 
@@ -34,7 +34,8 @@ namespace RBNWES001 {
          * @param two the second (LHS) charPair to be compared
          * @return true or false
          */
-        bool operator<(CharCouple& rhs) const {
+        bool operator<(const CharCouple& rhs) const {
+//            return ((this->first * 128 + this->second) < (rhs.first * 128 + rhs.second));
             if (this->first > rhs.first) {
                 return false;
             }//If the first character of the second pair is less than that of the first pair, false
@@ -46,19 +47,53 @@ namespace RBNWES001 {
             } //If both pairs are equal, return true.
             return true;
         }
+        
+        /**
+         * Operator<< overload
+         */
+        friend ostream& operator<<(ostream& os, const CharCouple& cc);
     };
+    
+    /**
+     * Non-member operator << overload for CharCouple struct
+     * @param os the ostream to << to
+     * @param cc the charcouple to <<
+     * @return the ostream
+     */
+    ostream& operator<<(ostream& os, const CharCouple& cc)
+    {
+        os << cc.first << cc.second;
+        return os;
+    }
 
+    /**
+     * Counter functor that counts the occurences of chars and CharCouples, 
+     * storing them in maps templated appropriately.
+     */
     class Counter {
     public:
-        map<char, int> count;
+        map<char, int> countSingle;     //For single chars
+        map<CharCouple, int> countCouple;       //For char couplets
+        
         Counter(void){};
+        
+        /**
+         * Operator() overload, causing this class to become a functor, updates
+         * the single char and char couplet maps stored in the functor.
+         * @param str The string whose characters are to be counted
+         */
         void operator() (const string& str) {
-            char ch;
-            for (int i = 0 ; i < str.length() ; i++) {
-                ++count[str[i]];
+            CharCouple temp;
+            ++countSingle[str[0]];
+            for (int i = 1 ; i < str.length() ; i++) {
+                temp.first = str[i-1];
+                temp.second = str[i];
+                ++countCouple[temp];
+                ++countSingle[str[i]];
             }
         }
     };
+    
 }
 
 int main(int argc, char** argv) {
@@ -117,30 +152,39 @@ int main(int argc, char** argv) {
     }
 
     thread * threads = new thread[numThreads];
-    Counter * functors = new Counter[numThreads];
+    Counter * counterFunctor = new Counter[numThreads];
     
     for (int i = 0 ; i < numThreads ; i++) {
-        threads[i] = thread(ref(functors[i]), section[i]);
+        threads[i] = thread(ref(counterFunctor[i]), section[i]);
     }
     
     for (int i = 0 ; i < numThreads ; i++) {
         threads[i].join();
     }
     
-    map<char, int> finalCount;
+    map<char, int> finalSingleCount;
+    map<CharCouple, int> finalCoupleCount;
     
     for (int i = 0 ; i < numThreads ; i++) {
-        for( map<char, int>::iterator ii = functors[i].count.begin(); ii != functors[i].count.end(); ++ii)
+        for( map<char, int>::iterator ii = counterFunctor[i].countSingle.begin(); ii != counterFunctor[i].countSingle.end(); ++ii)
         {
-            finalCount[(*ii).first] += (*ii).second;
+            finalSingleCount[(*ii).first] += (*ii).second;
+        }
+        for( map<CharCouple, int>::iterator ij = counterFunctor[i].countCouple.begin(); ij != counterFunctor[i].countCouple.end(); ++ij)
+        {
+            finalCoupleCount[(*ij).first] += (*ij).second;
         }
     }
     
-    for( map<char, int>::iterator ii = finalCount.begin(); ii != finalCount.end(); ++ii)
+    for( map<char, int>::iterator i = finalSingleCount.begin(); i != finalSingleCount.end(); ++i)
     {
-        cout << (*ii).first << ": " << (*ii).second << endl;
+        cout << (*i).first << ": " << (*i).second << endl;
+    }
+    cout << "********" << endl;
+    for( map<CharCouple, int>::iterator i = finalCoupleCount.begin(); i != finalCoupleCount.end(); ++i)
+    {
+        cout << (*i).first << ": " << (*i).second << endl;
     }
 
     return 0;
 }
-
