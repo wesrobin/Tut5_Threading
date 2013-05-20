@@ -16,12 +16,31 @@
 #include <string>
 #include <map>
 #include <algorithm>
+#include <chrono>
 
 #include "cmdline_parser.h"
 
 using namespace std;
 
 namespace RBNWES001 {
+    
+    /**
+     * Code to switch the key and value fields of a map, taken from:
+     * http://stackoverflow.com/questions/5056645/sorting-stdmap-using-value
+     */
+    template<typename A, typename B>
+    pair<B,A> flip_pair(const pair<A,B> &p)
+    {
+        return pair<B,A>(p.second, p.first);
+    }
+
+    template<typename A, typename B>
+    map<B,A> flip_map(const map<A,B> &src)
+    {
+        map<B,A> dst;
+        transform(src.begin(), src.end(), inserter(dst, dst.begin()), flip_pair<A,B>);
+        return dst;
+    }
 
     struct CharCouple { //Structure for pairs of characters, eg 'ab'
         char first;
@@ -35,7 +54,7 @@ namespace RBNWES001 {
          * @return true or false
          */
         bool operator<(const CharCouple& rhs) const {
-//            return ((this->first * 128 + this->second) < (rhs.first * 128 + rhs.second));
+            //            return ((this->first * 128 + this->second) < (rhs.first * 128 + rhs.second));
             if (this->first > rhs.first) {
                 return false;
             }//If the first character of the second pair is less than that of the first pair, false
@@ -47,36 +66,36 @@ namespace RBNWES001 {
             } //If both pairs are equal, return true.
             return true;
         }
-        
+
         /**
          * Operator<< overload
          */
         friend ostream& operator<<(ostream& os, const CharCouple& cc);
     };
-    
+
     /**
      * Non-member operator << overload for CharCouple struct
      * @param os the ostream to << to
      * @param cc the charcouple to <<
      * @return the ostream
      */
-    ostream& operator<<(ostream& os, const CharCouple& cc)
-    {
+    ostream& operator<<(ostream& os, const CharCouple& cc) {
         os << cc.first << cc.second;
         return os;
     }
 
     /**
-     * Counter functor that counts the occurences of chars and CharCouples, 
+     * Counter functor that counts the occurrences of chars and CharCouples, 
      * storing them in maps templated appropriately.
      */
     class Counter {
     public:
-        map<char, int> countSingle;     //For single chars
-        map<CharCouple, int> countCouple;       //For char couplets
-        
-        Counter(void){};
-        
+        map<char, int> countSingle; //For single chars
+        map<CharCouple, int> countCouple; //For char couplets
+
+        Counter(void) {
+        };
+
         /**
          * Operator() overload, causing this class to become a functor, updates
          * the single char and char couplet maps stored in the functor.
@@ -85,15 +104,81 @@ namespace RBNWES001 {
         void operator() (const string& str) {
             CharCouple temp;
             ++countSingle[str[0]];
-            for (int i = 1 ; i < str.length() ; i++) {
-                temp.first = str[i-1];
+            for (int i = 1; i < str.length(); i++) {
+                temp.first = str[i - 1];
                 temp.second = str[i];
                 ++countCouple[temp];
                 ++countSingle[str[i]];
             }
+//            //*********** STL Implementation
+//            temp.first = str[0];
+//            for_each(str.begin(), str.end(), [&]()->void {
+//                
+//            });
         }
     };
-    
+
+    /**
+     * Collator functor that counts the occurrences of chars and CharCouples, 
+     * storing them in maps templated appropriately.
+     */
+    class Collator {
+    public:
+        int period, threads;
+        Counter * counters;
+        bool running;
+
+        Collator(int period_, Counter* counters_, int threads_) : period(period_), counters(counters_), threads(threads_), running(true) {
+        };
+        
+        void stopRunning() {
+            running = false;
+        }
+
+        void operator() (void) {
+            while (running) {
+                cout << "********" << running << endl;
+                map<char, int> singleCount;
+                map<CharCouple, int> coupleCount;
+
+                map<int, char> singleCountSwitched;
+                map<int, CharCouple> coupleCountSwitched;
+                
+                this_thread::sleep_for(chrono::milliseconds(period));
+                for (int i = 0; i < threads; i++) {
+                    for (map<char, int>::iterator ii = counters[i].countSingle.begin(); ii != counters[i].countSingle.end(); ++ii) {
+                        singleCount[(*ii).first] += (*ii).second;
+                    }
+                    for (map<CharCouple, int>::iterator ij = counters[i].countCouple.begin(); ij != counters[i].countCouple.end(); ++ij) {
+                        coupleCount[(*ij).first] += (*ij).second;
+                    }
+                }
+                
+                singleCountSwitched = flip_map(singleCount);    //Flip the values and keys to give a new map that is ordered by the counts
+                coupleCountSwitched = flip_map(coupleCount);    
+                
+                map<int, char>::iterator sit = --singleCountSwitched.end();     //Since the switched map is ordered from smallest to biggest, start from the last element (one less than .end())
+                for (int i = 0 ; i < 10; i++) { //Return the 10 highest counts
+                    if (sit != singleCountSwitched.begin()) {   //If there are less than 10 elements, break out after printing the last element
+                        cout << (*sit).second << ": " << (*sit).first << endl;
+                        --sit;
+                    }
+                    else {cout << (*sit).second << ": " << (*sit).first << endl;break;}
+                }
+                
+                map<int, CharCouple>::iterator cit = --coupleCountSwitched.end();
+                for (int i = 0 ; i < 10; i++) {
+                    if (cit != coupleCountSwitched.begin()) {
+                        cout << (*cit).second << ": " << (*cit).first << endl;
+                        --cit;
+                    }
+                    else {break;}
+                }
+                cout << "********" << endl;
+                
+            }
+        }
+    };
 }
 
 int main(int argc, char** argv) {
@@ -129,9 +214,11 @@ int main(int argc, char** argv) {
         cout << "Error opening file" << endl;
         exit(EXIT_FAILURE);
     }
-    
-    fileStr.erase(remove_if(fileStr.begin(), fileStr.end(), [](char c) {return isspace(c);}), fileStr.end());   //Remove all spaces from string
-    
+
+    fileStr.erase(remove_if(fileStr.begin(), fileStr.end(), [](char c) {
+        return isspace(c);
+    }), fileStr.end()); //Remove all spaces from string
+
     inpFileStream.close();
 
     int numThreads = parser.get_num_threads();
@@ -139,52 +226,34 @@ int main(int argc, char** argv) {
 
     cout << "Number of threads: " << numThreads << endl;
     cout << "Period (ms): " << period << endl;
-    
+
     string * section = new string[numThreads];
-    
-    int fileLen = fileStr.length();     //Number of characters in the file
-    
+
+    int fileLen = fileStr.length(); //Number of characters in the file
+
     int at, pre = 0, i;
     for (pre = i = 0; i < numThreads; ++i) {
-        at = (fileLen + fileLen*i)/numThreads;
-        section[i] = fileStr.substr(pre, at-pre);
+        at = (fileLen + fileLen * i) / numThreads;
+        section[i] = fileStr.substr(pre, at - pre);
         pre = at;
     }
 
     thread * threads = new thread[numThreads];
     Counter * counterFunctor = new Counter[numThreads];
-    
-    for (int i = 0 ; i < numThreads ; i++) {
+
+    for (int i = 0; i < numThreads; i++) {
         threads[i] = thread(ref(counterFunctor[i]), section[i]);
     }
     
-    for (int i = 0 ; i < numThreads ; i++) {
+    Collator collatorFunctor(period, counterFunctor, numThreads);
+    thread collator(ref(collatorFunctor));
+
+    for (int i = 0; i < numThreads; i++) {
         threads[i].join();
     }
     
-    map<char, int> finalSingleCount;
-    map<CharCouple, int> finalCoupleCount;
-    
-    for (int i = 0 ; i < numThreads ; i++) {
-        for( map<char, int>::iterator ii = counterFunctor[i].countSingle.begin(); ii != counterFunctor[i].countSingle.end(); ++ii)
-        {
-            finalSingleCount[(*ii).first] += (*ii).second;
-        }
-        for( map<CharCouple, int>::iterator ij = counterFunctor[i].countCouple.begin(); ij != counterFunctor[i].countCouple.end(); ++ij)
-        {
-            finalCoupleCount[(*ij).first] += (*ij).second;
-        }
-    }
-    
-    for( map<char, int>::iterator i = finalSingleCount.begin(); i != finalSingleCount.end(); ++i)
-    {
-        cout << (*i).first << ": " << (*i).second << endl;
-    }
-    cout << "********" << endl;
-    for( map<CharCouple, int>::iterator i = finalCoupleCount.begin(); i != finalCoupleCount.end(); ++i)
-    {
-        cout << (*i).first << ": " << (*i).second << endl;
-    }
+    collatorFunctor.stopRunning();
+    collator.join();    
 
     return 0;
 }
