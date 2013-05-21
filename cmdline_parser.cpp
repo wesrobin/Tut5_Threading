@@ -30,9 +30,9 @@ cmdline_parser::cmdline_parser(void) : vm(), od("Options") {
     od.add_options()
             ("help,?", "show usage help")
 
-            ((INPUTFILE + ",i").c_str(), po::value<std::string>(), "input file name")
-            ((NUMTHREADS + ",t").c_str(), po::value<int>(), "number of threads to be used")
-            ((PERIOD + ",p").c_str(), po::value<int>(), "period (ms) after which to collate and print frequencies");
+            ((INPUTFILE + ",i").c_str(), po::value<std::string>(), "input file name (default \"input.txt\")")
+            ((NUMTHREADS + ",t").c_str(), po::value<int>(), "number of threads to be used (default 4)")
+            ((PERIOD + ",p").c_str(), po::value<int>(), "period (ms) after which to collate and print frequencies (default 100)");
 };
 
 //-------------------------------------------------------------------------//
@@ -74,8 +74,8 @@ if (vm.count(PERIOD) + vm.count(NUMTHREADS) != 2) {
  * returns the file name of the input file
  */
 std::string cmdline_parser::get_input_filename(void) const {
-    if (vm.count(INPUTFILE) == 0)//If unspecified return input.txt
-        return "input.txt";
+    if (vm.count(INPUTFILE) == 0)//If unspecified
+        return "input.txt";     //Default filename
     return vm[INPUTFILE].as<std::string>();
 }
 
@@ -87,7 +87,6 @@ int cmdline_parser::get_num_threads(void) {
     if (vm.count(NUMTHREADS) == 0) //If unspecified
         return 4; //Default thread number
     return vm[NUMTHREADS].as<int>();
-    //return boost::any_cast<int>(vm[NUMTHREADS]);
 }
 
 /**Get period
@@ -96,7 +95,7 @@ int cmdline_parser::get_num_threads(void) {
  */
 int cmdline_parser::get_period(void) {
     if (vm.count(PERIOD) == 0) //If unspecified
-        return 4000; //Default period (in ms)
+        return 100; //Default period (in ms)
     return vm[PERIOD].as<int>();
 }
 
