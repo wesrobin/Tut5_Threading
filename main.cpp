@@ -95,7 +95,7 @@ namespace RBNWES001 {
 
         Counter(void) {
         };
-
+       
         /**
          * Operator() overload, causing this class to become a functor, updates
          * the single char and char couplet maps stored in the functor.
@@ -103,18 +103,26 @@ namespace RBNWES001 {
          */
         void operator() (const string& str) {
             CharCouple temp;
-            ++countSingle[str[0]];
-            for (int i = 1; i < str.length(); i++) {
-                temp.first = str[i - 1];
-                temp.second = str[i];
-                ++countCouple[temp];
-                ++countSingle[str[i]];
-            }
-//            //*********** STL Implementation
-//            temp.first = str[0];
-//            for_each(str.begin(), str.end(), [&]()->void {
-//                
-//            });
+//            ++countSingle[str[0]];
+//            for (int i = 1; i < str.length(); i++) {
+//                temp.first = str[i - 1];
+//                temp.second = str[i];
+//                ++countCouple[temp];
+//                ++countSingle[str[i]];
+//            }
+            //*********** STL Implementation ***********
+            for_each(str.begin(), str.end(), [&](const char& c)->void {
+                if (c == *str.begin()) {
+                    temp.second = c;
+                }
+                else {
+                    temp.first = temp.second;
+                    temp.second = c;
+                    ++countCouple[temp];
+                }
+                ++countSingle[c];
+            });
+            //******************************************
         }
     };
 
@@ -124,56 +132,99 @@ namespace RBNWES001 {
      */
     class Collator {
     public:
-        int period, threads;
+        int period, numThreads_;
         Counter * counters;
         bool running;
 
-        Collator(int period_, Counter* counters_, int threads_) : period(period_), counters(counters_), threads(threads_), running(true) {
+        Collator(int period_, Counter* counters_, int threads_) : period(period_), counters(counters_), numThreads_(threads_), running(true) {
         };
         
+        /**
+         * Method to signal that the thread should stop looping by changing the
+         * running variable to false
+         */
         void stopRunning() {
             running = false;
         }
 
         void operator() (void) {
-            while (running) {
-                cout << "********" << running << endl;
-                map<char, int> singleCount;
+            while (running) {   //Runs until running becomes false
+                this_thread::sleep_for(chrono::milliseconds(period));   //Sleeps the thread so it will not attain data again until it needs to
+                
+                cout << "********" << endl;
+                map<char, int> singleCount;     //Variables are instantiated in the loop so that they are destroyed each time the loop is completed
                 map<CharCouple, int> coupleCount;
 
                 map<int, char> singleCountSwitched;
                 map<int, CharCouple> coupleCountSwitched;
                 
-                this_thread::sleep_for(chrono::milliseconds(period));
-                for (int i = 0; i < threads; i++) {
-                    for (map<char, int>::iterator ii = counters[i].countSingle.begin(); ii != counters[i].countSingle.end(); ++ii) {
-                        singleCount[(*ii).first] += (*ii).second;
-                    }
-                    for (map<CharCouple, int>::iterator ij = counters[i].countCouple.begin(); ij != counters[i].countCouple.end(); ++ij) {
-                        coupleCount[(*ij).first] += (*ij).second;
-                    }
-                }
+//                for (int i = 0; i < numThreads_; i++) {
+//                    for (map<char, int>::iterator ii = counters[i].countSingle.begin(); ii != counters[i].countSingle.end(); ++ii) {
+//                        singleCount[(*ii).first] += (*ii).second;
+//                    }
+//                    for (map<CharCouple, int>::iterator ij = counters[i].countCouple.begin(); ij != counters[i].countCouple.end(); ++ij) {
+//                        coupleCount[(*ij).first] += (*ij).second;
+//                    }
+//                }
+                
+                //*********** STL Implementation ***********
+                for_each(counters, counters + numThreads_, [&](Counter& counter)->void {
+                    map<char, int> charCounts = counter.countSingle;
+                    for_each(charCounts.begin(), charCounts.end(), [&](std::pair<const char, int>& p)->void {
+                        singleCount[p.first] += p.second;
+                    });
+                    
+                    map<CharCouple, int> coupleCounts = counter.countCouple;
+                    for_each(coupleCounts.begin(), coupleCounts.end(), [&](pair<const CharCouple, int>& p)->void {
+                        coupleCount[p.first] += p.second;
+                    });
+                });
+                //******************************************
                 
                 singleCountSwitched = flip_map(singleCount);    //Flip the values and keys to give a new map that is ordered by the counts
                 coupleCountSwitched = flip_map(coupleCount);    
                 
-                map<int, char>::iterator sit = --singleCountSwitched.end();     //Since the switched map is ordered from smallest to biggest, start from the last element (one less than .end())
-                for (int i = 0 ; i < 10; i++) { //Return the 10 highest counts
-                    if (sit != singleCountSwitched.begin()) {   //If there are less than 10 elements, break out after printing the last element
-                        cout << (*sit).second << ": " << (*sit).first << endl;
-                        --sit;
-                    }
-                    else {cout << (*sit).second << ": " << (*sit).first << endl;break;}
-                }
+//                map<int, char>::iterator sit = --singleCountSwitched.end();     //Since the switched map is ordered from smallest to biggest, start from the last element (one less than .end())
+//                for (int i = 0 ; i < 10; i++) { //Return the 10 highest counts
+//                    if (sit != singleCountSwitched.begin()) {   //If there are less than 10 elements, break out after printing the last element
+//                        cout << (*sit).second << ": " << (*sit).first << endl;
+//                        --sit;
+//                    }
+//                    else {cout << (*sit).second << ": " << (*sit).first << endl;break;}
+//                }
+//                
+//                map<int, CharCouple>::iterator cit = --coupleCountSwitched.end();
+//                for (int i = 0 ; i < 10; i++) {
+//                    if (cit != coupleCountSwitched.begin()) {
+//                        cout << (*cit).second << ": " << (*cit).first << endl;
+//                        --cit;
+//                    }
+//                    else {break;}
+//                }
                 
-                map<int, CharCouple>::iterator cit = --coupleCountSwitched.end();
-                for (int i = 0 ; i < 10; i++) {
-                    if (cit != coupleCountSwitched.begin()) {
-                        cout << (*cit).second << ": " << (*cit).first << endl;
-                        --cit;
-                    }
-                    else {break;}
+                //*********** STL Implementation ***********
+                auto beginPointSingle = singleCountSwitched.end();
+                if (singleCountSwitched.size() > 10) {
+                    advance(beginPointSingle, -10);     //Begin at the 10th-to-last element
                 }
+                else {
+                    beginPointSingle = singleCountSwitched.begin();   //If there are less than 10 counts, just start at the beginning
+                }
+                for_each(beginPointSingle, singleCountSwitched.end(), [&](pair<const int, char>& p)->void {
+                    cout << p.second << ": " << p.first << endl;
+                });
+                
+                auto beginPointCouple = coupleCountSwitched.end();
+                if (coupleCountSwitched.size() > 10) {
+                    advance(beginPointCouple, -10);     //Begin at the 10th-to-last element
+                }
+                else {
+                    beginPointCouple = coupleCountSwitched.begin();   //If there are less than 10 counts, just start at the beginning
+                }
+                for_each(beginPointCouple, coupleCountSwitched.end(), [&](pair<const int, CharCouple>& p)->void {
+                    cout << p.second << ": " << p.first << endl;
+                });
+                //******************************************
                 cout << "********" << endl;
                 
             }
@@ -253,7 +304,7 @@ int main(int argc, char** argv) {
     }
     
     collatorFunctor.stopRunning();
-    collator.join();    
-
+    collator.join();    //Allows the collator to finish printing out the final count
+  
     return 0;
 }
